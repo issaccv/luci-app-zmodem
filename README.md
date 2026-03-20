@@ -71,8 +71,17 @@ git clone https://github.com/issaccv/luci-app-zmodem.git
 cd /home/zhouquan/openwrt-nradio-25.12
 ./scripts/feeds update luci
 ./scripts/feeds install luci-base
-make package/mtk/luci-app-zmodem/compile V=s
+CMAKE_POLICY_VERSION_MINIMUM=3.5 make package/mtk/luci-app-zmodem/compile V=s
 ```
+
+这一步之所以显式带上 `CMAKE_POLICY_VERSION_MINIMUM=3.5`，是因为某些较新的构建环境里，
+`lucihttp` 依赖会触发 CMake 兼容策略错误：
+
+```text
+Compatibility with CMake < 3.5 has been removed
+```
+
+如果你的树没有这个问题，也可以去掉这个环境变量再试。
 
 如果包尚未进入 `.config`，可以先执行：
 
@@ -85,6 +94,12 @@ make defconfig
 
 ```sh
 bin/packages/aarch64_cortex-a53/base/
+```
+
+在我这次使用的 mt798x/OpenWrt 树里，最终产物格式是 `apk`，例如：
+
+```sh
+bin/packages/aarch64_cortex-a53/base/luci-app-zmodem-1.2.0-r2.apk
 ```
 
 ## 模式切换建议

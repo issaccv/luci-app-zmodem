@@ -1,10 +1,18 @@
 #!/bin/sh
+LOCK_FILE="/tmp/pingCheck.lock"
 Enable_PING=`uci -q get modem.@ndis[0].pingen` || Enable_PING=0
-if [ ${Enable_PING} == 0 ];then
-    rm -rf "$LOCK_FILE"
+NETWORK_MODE=`uci -q get modem.@ndis[0].network_mode` || NETWORK_MODE=router
+if [ "${Enable_PING}" = 0 ];then
+    rm -f "$LOCK_FILE"
     exit 1
 fi
-LOCK_FILE="/tmp/pingCheck.lock"
+
+if [ "$NETWORK_MODE" = "passthrough" ]; then
+    echo "桥接透传模式下跳过路由侧 Ping 检测" > /tmp/pingCheck.log
+    rm -f "$LOCK_FILE"
+    exit 0
+fi
+
 if [ -e "$LOCK_FILE" ]; then
     echo "pingCheck互斥" >> /tmp/pingCheck.log
     exit 1
@@ -36,7 +44,7 @@ while :; do
     else
         echo "SIM卡未准备就绪" >> /tmp/pingCheck.log
         if [ -e "$REST_FILE" ]; then
-            rm -rf "$LOCK_FILE"
+            rm -f "$LOCK_FILE"
             echo "重启无效 退出脚本" >> /tmp/pingCheck.log
             exit 0
             else

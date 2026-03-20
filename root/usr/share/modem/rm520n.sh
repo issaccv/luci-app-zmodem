@@ -6,6 +6,17 @@ printMsg() {
     local msg="$1"
     logger -t "${PROGRAM}" "${msg}"
 } #日志输出调用API
+
+schedule_router_ifup() {
+    local delay="$1"
+    if [ "$Network_Mode" = "passthrough" ]; then
+        return 0
+    fi
+
+    sleep "$delay" && /sbin/ifup wan &
+    sleep "$delay" && /sbin/ifup wan6 &
+}
+
 sleep 2 && /sbin/uci commit
 Modem_Enable=`uci -q get modem.@ndis[0].enable` || Modem_Enable=1
 #模块启动
@@ -27,24 +38,27 @@ Band_NSA=`uci -q get modem.@ndis[0].bandlist_nsa` || Band_NSA=0
 Enable_PING=`uci -q get modem.@ndis[0].pingen` || Enable_PING=0
 PING_Addr=`uci -q get modem.@ndis[0].pingaddr` || PING_Addr="119.29.29.29"
 PING_Count=`uci -q get modem.@ndis[0].count` || PING_Count=10
+Network_Mode=`uci -q get modem.@ndis[0].network_mode` || Network_Mode="router"
 
-if [ "$Modem_Enable" == 0 ]; then
+/usr/share/modem/network_mode.sh apply >/dev/null 2>&1
+
+if [ "$Modem_Enable" = 0 ]; then
     echo 1 >/sys/class/gpio/cpe-pwr/value
     printMsg "禁用移动网络"
     echo "Modem_Enable: $Modem_Enable 模块禁用" >> /tmp/rm520n.log
 fi
 
-if [ ${Enable_PING} == 1 ];then
+if [ "${Enable_PING}" = 1 ] && [ "$Network_Mode" != "passthrough" ]; then
     /usr/share/modem/pingCheck.sh &
 else 
     process=`ps -ef | grep "pingCheck" | grep -v grep | awk '{print $1}'` 
-    if [[ -n "$process" ]]; then
+    if [ -n "$process" ]; then
         kill -9 "$process" >/dev/null 2>&1
     fi
-    rm -rf /tmp/pingCheck.lock
+    rm -f /tmp/pingCheck.lock
 fi
 
-if [ ${Enable_IMEI} == 1 ];then
+if [ "${Enable_IMEI}" = 1 ]; then
     IMEI_file="/tmp/IMEI"
     if [ -e "$IMEI_file" ]; then
         last_IMEI=$(cat "$IMEI_file")
@@ -71,10 +85,10 @@ else
 fi
 #--
 if [ "$RF_Mode" != "$last_RF_Mode" ]; then
-    if [ "$RF_Mode" == 0 ]; then
+    if [ "$RF_Mode" = 0 ]; then
         echo "RF_Mode: $RF_Mode 自动网络" >> /tmp/rm520n.log
         sendat 2 'AT+QNWPREFCFG="mode_pref",AUTO' >> /tmp/rm520n.log
-    elif [ "$RF_Mode" == 1 ]; then
+    elif [ "$RF_Mode" = 1 ]; then
         echo "RF_Mode: $RF_Mode 4G网络" >> /tmp/rm520n.log
         sendat 2 'AT+QNWPREFCFG="mode_pref",LTE' >> /tmp/rm520n.log
     elif [ "$RF_Mode" = 2 ]; then
@@ -97,7 +111,7 @@ else
 fi
 #--
 if [ "$Band_LTE" != "$last_Band_LTE" ]; then
-    if [ "$Band_LTE" == 0 ]; then
+    if [ "$Band_LTE" = 0 ]; then
         sendat_command='AT+QNWPREFCFG="lte_band",1:3:5:8:34:38:39:40:41'
         sendat_result=$(sendat 2 "$sendat_command")
         echo "LTE自动: $sendat_result" >> /tmp/rm520n.log
@@ -122,7 +136,7 @@ else
 fi
 #--
 if [ "$NR_Mode" != "$last_NR_Mode" ]; then
-    if [ "$NR_Mode" == 0 ]; then
+    if [ "$NR_Mode" = 0 ]; then
         echo "NR_Mode: $NR_Mode 自动网络" >> /tmp/rm520n.log
         sendat 2 'AT+QNWPREFCFG="nr5g_disable_mode",0' >> /tmp/rm520n.log
     elif [ "$NR_Mode" = 1 ]; then
@@ -148,7 +162,7 @@ else
 fi
 #--
 if [ "$Band_SA" != "$last_Band_SA" ]; then
-    if [ "$Band_SA" == 0 ]; then
+    if [ "$Band_SA" = 0 ]; then
         sendat_command='AT+QNWPREFCFG="nr5g_band",1:3:8:28:41:78'
         sendat_result=$(sendat 2 "$sendat_command")
         echo "SA自动: $sendat_result" >> /tmp/rm520n.log
@@ -173,7 +187,7 @@ else
 fi
 
 if [ "$Band_NSA" != "$last_Band_NSA" ]; then
-    if [ "$Band_NSA" == 0 ]; then
+    if [ "$Band_NSA" = 0 ]; then
         sendat_command='AT+QNWPREFCFG="nsa_nr5g_band",41:78'
         sendat_result=$(sendat 2 "$sendat_command")
         echo "NSA自动: $sendat_result" >> /tmp/rm520n.log
@@ -196,8 +210,7 @@ if [ ! -f "/tmp/sim_sel" ] || [ "$(cat /tmp/sim_sel)" != "$Sim_Sel" ]; then
             sendat 2 "AT+QUIMSLOT=1"
             echo "外置SIM卡" >> /tmp/rm520n.log
             echo 0 > /tmp/sim_sel
-            sleep 20 && /sbin/ifup wan up &
-            sleep 20 && /sbin/ifup wan6 up &
+            schedule_router_ifup 20
         ;;
         1)
             printMsg "内置SIM1"
@@ -206,8 +219,7 @@ if [ ! -f "/tmp/sim_sel" ] || [ "$(cat /tmp/sim_sel)" != "$Sim_Sel" ]; then
             sendat 2 "AT+CFUN=1,1"
             echo "内置SIM卡1" >> /tmp/rm520n.log
             echo 1 > /tmp/sim_sel
-            sleep 30 && /sbin/ifup wan up &
-            sleep 30 && /sbin/ifup wan6 up &
+            schedule_router_ifup 30
         ;;
         2)
             printMsg "内置SIM2"
@@ -216,8 +228,7 @@ if [ ! -f "/tmp/sim_sel" ] || [ "$(cat /tmp/sim_sel)" != "$Sim_Sel" ]; then
             sendat 2 "AT+CFUN=1,1"
             echo "内置SIM卡2" >> /tmp/rm520n.log
             echo 2 > /tmp/sim_sel
-            sleep 30 && /sbin/ifup wan up &
-            sleep 30 && /sbin/ifup wan6 up &
+            schedule_router_ifup 30
         ;;
         *)
             printMsg "错误状态"
@@ -225,8 +236,10 @@ if [ ! -f "/tmp/sim_sel" ] || [ "$(cat /tmp/sim_sel)" != "$Sim_Sel" ]; then
             sendat 2 "AT+CFUN=1,1"
             echo 3 > /tmp/Sim_Sel
             echo "SIM状态错误" >> /tmp/rm520n.log
-            sleep 30 && /sbin/ifup wan up
-            sleep 30 && /sbin/ifup wan6 up
+            if [ "$Network_Mode" != "passthrough" ]; then
+                sleep 30 && /sbin/ifup wan
+                sleep 30 && /sbin/ifup wan6
+            fi
         ;;
         esac
 else

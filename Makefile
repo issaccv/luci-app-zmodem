@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-zmodem
-PKG_VERSION:=1.1.1
-PKG_RELEASE:=1
+PKG_VERSION:=1.2.0
+PKG_RELEASE:=2
 
 LUCI_TITLE:=LuCI for zmodem
 LUCI_PKGARCH:=all

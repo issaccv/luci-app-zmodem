@@ -10,16 +10,38 @@ section.addremove = false
 enable = section:taboption("general", Flag, "enable", translate("启用模块"))
 enable.rmempty  = false
 
-
 simsel= section:taboption("general", ListValue, "simsel", translate("SIM卡选择"))
 simsel:value("0", translate("外置SIM卡"))
 simsel:value("1", translate("内置SIM1"))
 simsel:value("2", translate("内置SIM2"))
 simsel.rmempty = true
 
+network_mode = section:taboption("general", ListValue, "network_mode", translate("网络模式"))
+network_mode.default = "router"
+network_mode:value("router", translate("路由/NAT"))
+network_mode:value("passthrough", translate("桥接透传"))
+
+modem_netdev = section:taboption("general", Value, "modem_netdev", translate("基带数据接口"))
+modem_netdev.default = "eth1"
+modem_netdev.placeholder = "eth1"
+
+passthrough_port = section:taboption("general", ListValue, "passthrough_port", translate("透传LAN口"))
+passthrough_port.default = "lan4"
+passthrough_port:value("lan1", "lan1")
+passthrough_port:value("lan2", "lan2")
+passthrough_port:value("lan3", "lan3")
+passthrough_port:value("lan4", "lan4")
+passthrough_port:depends("network_mode", "passthrough")
+
 pincode = section:taboption("general", Value, "pincode", translate("PIN密码"))
 pincode.readonly = true
 ------
+
+passthrough_bridge = section:taboption("advanced", Value, "passthrough_bridge", translate("透传桥名称"))
+passthrough_bridge.default = "br-modem"
+passthrough_bridge.placeholder = "br-modem"
+passthrough_bridge:depends("network_mode", "passthrough")
+
 smode = section:taboption("advanced", ListValue, "smode", translate("网络制式"))
 smode.default = "0"
 smode:value("0", translate("自动"))

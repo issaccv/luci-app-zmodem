@@ -1,6 +1,10 @@
 config ndis
 	option enable '1'
 	option simsel '0'
+	option network_mode 'router'
+	option modem_netdev 'eth1'
+	option passthrough_port 'lan4'
+	option passthrough_bridge 'br-modem'
 	option smode '0'
 	option bandlist_lte '0'
 	option bandlist_nr '0'
